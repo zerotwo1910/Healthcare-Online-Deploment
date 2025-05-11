@@ -52,7 +52,7 @@ BASE_HTML = """
         body {
             font-family: 'Roboto', sans-serif;
             background: #121212;
-            color: #E0E0E0;
+            color: #F5F5F5;
             min-height: 100vh;
             position: relative;
         }
@@ -81,7 +81,7 @@ BASE_HTML = """
         }
         .sidebar a {
             display: block;
-            color: #E0E0E0;
+            color: #F5F5F5;
             text-decoration: none;
             padding: 10px;
             margin-bottom: 10px;
@@ -112,7 +112,7 @@ BASE_HTML = """
             padding: 15px;
             margin-bottom: 20px;
             text-align: center;
-            color: #E0E0E0;
+            color: #F5F5F5;
         }
         .flash-message.error {
             border-color: #ef5350;
@@ -122,20 +122,27 @@ BASE_HTML = """
             border-color: #4caf50;
             color: #4caf50;
         }
+        input:focus, select:focus, button:focus {
+            outline: 2px solid #BB86FC;
+            outline-offset: 2px;
+        }
+        label {
+            color: #F5F5F5;
+        }
     </style>
 </head>
 <body>
     <div id="particles-js"></div>
     <div class="sidebar">
         <h3>Healthcare AI</h3>
-        <a href="/">Home</a>
-        <a href="/visualise">Visualise Results</a>
+        <a href="/" aria-label="Go to Home page">Home</a>
+        <a href="/visualise" aria-label="Visualize model performance results">Visualise Results</a>
     </div>
     <div class="main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="flash-message {{ category }}">
+                    <div class="flash-message {{ category }}" role="alert">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -174,18 +181,23 @@ BASE_HTML = """
 # Predict page template (fully hardcoded)
 PREDICT_HTML = """
 <h1 style="margin-bottom: 20px;">Predict Heart Disease</h1>
-<form method="POST" action="/" style="margin-bottom: 20px;">
+<p style="color: #ef5350; margin-bottom: 20px;">
+    <strong>Disclaimer:</strong> This tool is for educational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment.
+</p>
+<form id="prediction-form" style="margin-bottom: 20px;">
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
         <!-- Age -->
         <div style="display: flex; flex-direction: column;">
             <label for="Age" style="margin-bottom: 5px; font-weight: 500;">Age</label>
             <input type="number" id="Age" name="Age" step="any" value="63.0"
-                   required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+                   required aria-label="Patient age in years"
+                   style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
         </div>
         <!-- Sex -->
         <div style="display: flex; flex-direction: column;">
             <label for="Sex" style="margin-bottom: 5px; font-weight: 500;">Sex</label>
-            <select id="Sex" name="Sex" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="Sex" name="Sex" required aria-label="Patient sex"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0">Female</option>
                 <option value="1" selected>Male</option>
             </select>
@@ -193,7 +205,8 @@ PREDICT_HTML = """
         <!-- CP (Chest Pain Type) -->
         <div style="display: flex; flex-direction: column;">
             <label for="CP" style="margin-bottom: 5px; font-weight: 500;">Chest Pain Type</label>
-            <select id="CP" name="CP" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="CP" name="CP" required aria-label="Chest pain type"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0">Asymptomatic</option>
                 <option value="1">Typical Angina</option>
                 <option value="2">Atypical Angina</option>
@@ -204,18 +217,21 @@ PREDICT_HTML = """
         <div style="display: flex; flex-direction: column;">
             <label for="Trestbps" style="margin-bottom: 5px; font-weight: 500;">Resting BP</label>
             <input type="number" id="Trestbps" name="Trestbps" step="any" value="145.0"
-                   required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+                   required aria-label="Resting blood pressure in mm Hg"
+                   style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
         </div>
         <!-- Chol -->
         <div style="display: flex; flex-direction: column;">
             <label for="Chol" style="margin-bottom: 5px; font-weight: 500;">Cholesterol</label>
             <input type="number" id="Chol" name="Chol" step="any" value="233.0"
-                   required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+                   required aria-label="Serum cholesterol in mg/dl"
+                   style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
         </div>
         <!-- Fbs -->
         <div style="display: flex; flex-direction: column;">
             <label for="Fbs" style="margin-bottom: 5px; font-weight: 500;">Fasting Blood Sugar</label>
-            <select id="Fbs" name="Fbs" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="Fbs" name="Fbs" required aria-label="Fasting blood sugar level"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0">≤ 120 mg/dl</option>
                 <option value="1" selected>> 120 mg/dl</option>
             </select>
@@ -223,7 +239,8 @@ PREDICT_HTML = """
         <!-- Restecg -->
         <div style="display: flex; flex-direction: column;">
             <label for="Restecg" style="margin-bottom: 5px; font-weight: 500;">Resting ECG</label>
-            <select id="Restecg" name="Restecg" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="Restecg" name="Restecg" required aria-label="Resting electrocardiographic results"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0" selected>Normal</option>
                 <option value="1">ST-T Wave Abnormality</option>
                 <option value="2">Left Ventricular Hypertrophy</option>
@@ -233,12 +250,14 @@ PREDICT_HTML = """
         <div style="display: flex; flex-direction: column;">
             <label for="Thalach" style="margin-bottom: 5px; font-weight: 500;">Max Heart Rate</label>
             <input type="number" id="Thalach" name="Thalach" step="any" value="150.0"
-                   required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+                   required aria-label="Maximum heart rate achieved"
+                   style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
         </div>
         <!-- Exang -->
         <div style="display: flex; flex-direction: column;">
             <label for="Exang" style="margin-bottom: 5px; font-weight: 500;">Exercise Angina</label>
-            <select id="Exang" name="Exang" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="Exang" name="Exang" required aria-label="Exercise-induced angina"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0" selected>No</option>
                 <option value="1">Yes</option>
             </select>
@@ -247,12 +266,14 @@ PREDICT_HTML = """
         <div style="display: flex; flex-direction: column;">
             <label for="Oldpeak" style="margin-bottom: 5px; font-weight: 500;">ST Depression</label>
             <input type="number" id="Oldpeak" name="Oldpeak" step="any" value="2.3"
-                   required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+                   required aria-label="ST depression induced by exercise"
+                   style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
         </div>
         <!-- Slope -->
         <div style="display: flex; flex-direction: column;">
             <label for="Slope" style="margin-bottom: 5px; font-weight: 500;">Slope</label>
-            <select id="Slope" name="Slope" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="Slope" name="Slope" required aria-label="Slope of the peak exercise ST segment"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0" selected>Unsloping</option>
                 <option value="1">Flat</option>
                 <option value="2">Downsloping</option>
@@ -261,7 +282,8 @@ PREDICT_HTML = """
         <!-- CA -->
         <div style="display: flex; flex-direction: column;">
             <label for="CA" style="margin-bottom: 5px; font-weight: 500;">Major Vessels</label>
-            <select id="CA" name="CA" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="CA" name="CA" required aria-label="Number of major vessels colored by fluoroscopy"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0" selected>0 Vessels</option>
                 <option value="1">1 Vessel</option>
                 <option value="2">2 Vessels</option>
@@ -272,7 +294,8 @@ PREDICT_HTML = """
         <!-- Thal -->
         <div style="display: flex; flex-direction: column;">
             <label for="Thal" style="margin-bottom: 5px; font-weight: 500;">Thalassemia</label>
-            <select id="Thal" name="Thal" required style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #E0E0E0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
+            <select id="Thal" name="Thal" required aria-label="Thalassemia condition"
+                    style="padding: 8px; background: rgba(255, 255, 255, 0.1); color: #F5F5F5; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;">
                 <option value="0">Unknown</option>
                 <option value="1" selected>Normal</option>
                 <option value="2">Fixed Defect</option>
@@ -280,14 +303,71 @@ PREDICT_HTML = """
             </select>
         </div>
     </div>
+    <div id="error-message" style="color: #ef5350; margin-top: 10px; display: none;" role="alert"></div>
     <button type="submit" style="margin-top: 20px; padding: 10px 20px; background: #BB86FC; color: #121212; border: none; border-radius: 8px; cursor: pointer;">
         Predict
     </button>
 </form>
+<div id="loading" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.8); color: #BB86FC; padding: 10px 20px; border-radius: 8px;">
+    Predicting...
+</div>
 <div id="prediction-result" style="margin-top: 20px;">
     <h3 style="margin-bottom: 20px;">Prediction Result</h3>
     <p>Submit the form to see the prediction result.</p>
 </div>
+<script>
+    function validateForm() {
+        const inputs = document.querySelectorAll('input[type="number"]');
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.style.display = 'none';
+        errorDiv.innerText = '';
+        for (let input of inputs) {
+            const value = input.value.trim();
+            if (value === '' || isNaN(value)) {
+                errorDiv.innerText = `Please enter a valid number for ${input.name}.`;
+                errorDiv.style.display = 'block';
+                return false;
+            }
+        }
+        return true;
+    }
+
+    async function handleSubmit(event) {
+        event.preventDefault();
+        if (!validateForm()) return;
+
+        const loadingDiv = document.getElementById('loading');
+        loadingDiv.style.display = 'block';
+
+        const formData = new FormData(document.getElementById('prediction-form'));
+        try {
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newResult = doc.querySelector('#prediction-result').innerHTML;
+            document.getElementById('prediction-result').innerHTML = newResult;
+
+            // Display flash messages
+            const flashMessages = doc.querySelectorAll('.flash-message');
+            const mainContent = document.querySelector('.main-content');
+            const existingFlash = document.querySelectorAll('.flash-message');
+            existingFlash.forEach(msg => msg.remove());
+            flashMessages.forEach(msg => mainContent.insertBefore(msg, mainContent.firstChild));
+        } catch (error) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.innerText = 'An error occurred while predicting. Please try again.';
+            errorDiv.style.display = 'block';
+        } finally {
+            loadingDiv.style.display = 'none';
+        }
+    }
+
+    document.getElementById('prediction-form').onsubmit = handleSubmit;
+</script>
 """
 
 # Visualise page template
@@ -330,9 +410,10 @@ VISUALISE_HTML = """
 # Prediction result template (for POST response)
 PREDICTION_RESULT_HTML = """
 <h3 style="margin-bottom: 20px;">Prediction Result</h3>
-<div style="background: {{ '#ef5350' if prediction_class == 'danger' else '#4caf50' }}; padding: 15px; border-radius: 8px;">
+<div style="background: {{ '#ef5350' if prediction_class == 'danger' else '#4caf50' }}; padding: 15px; border-radius: 8px;" role="alert">
     <strong>{{ prediction_text }}</strong>
     <p>Probability: {{ probability }}%</p>
+    <p>Uncertainty: {{ uncertainty }}%</p>
 </div>
 """
 
