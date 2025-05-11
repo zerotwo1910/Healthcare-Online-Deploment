@@ -413,7 +413,6 @@ PREDICTION_RESULT_HTML = """
 <div style="background: {{ '#ef5350' if prediction_class == 'danger' else '#4caf50' }}; padding: 15px; border-radius: 8px;" role="alert">
     <strong>{{ prediction_text }}</strong>
     <p>Probability: {{ probability }}%</p>
-    <p>Uncertainty: {{ uncertainty }}%</p>
 </div>
 """
 
