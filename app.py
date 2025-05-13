@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Agg')  # Set non-interactive backend before importing pyplot
+matplotlib.use('Agg')
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, roc_curve, auc
+from sklearn.metrics import precision_recall_curve, f1_score, precision_score, recall_score, roc_auc_score
 from xgboost import XGBClassifier
 from flask import Flask, request, render_template_string, flash, make_response, send_from_directory
 import matplotlib.pyplot as plt
@@ -133,10 +134,13 @@ BASE_HTML = """
 </head>
 <body>
     <div id="particles-js"></div>
+
     <div class="sidebar">
         <h3>Healthcare AI</h3>
         <a href="/" aria-label="Go to Home page">Home</a>
-        <a href="/visualise" aria-label="Visualize model performance results">Visualise Results</a>
+        <a href="/dataset" aria-label="View loaded dataset">Loaded Dataset</a>
+        <a href="/model_visualisations" aria-label="Visualize model performance">Model Visualisations</a>
+        <a href="/patient_visualisations" aria-label="Visualize patient results">Patient Visualisations</a>
     </div>
     <div class="main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -152,28 +156,10 @@ BASE_HTML = """
             {{ content | safe }}
         </div>
     </div>
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-    <script>
-        const particlesConfig = {
-            particles: {
-                number: { value: 80, density: { enable: true, value_area: 800 } },
-                color: { value: ["#ffffff", "#b3e5fc", "#e1bee7"] },
-                shape: { type: "circle" },
-                opacity: { value: 0.5, random: true },
-                size: { value: 4, random: true },
-                line_linked: { enable: false },
-                move: { enable: true, speed: 2, direction: "none", random: true, out_mode: "out" }
-            },
-            interactivity: {
-                detect_on: "canvas",
-                events: { onhover: { enable: true, mode: "repulse" }, onclick: { enable: true, mode: "push" }, resize: true },
-                modes: { repulse: { distance: 100, duration: 0.4 }, push: { particles_nb: 4 } }
-            },
-            retina_detect: true
-        };
-        particlesJS("particles-js", particlesConfig);
-    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+    <script src="{{ url_for('static', filename='js/particles-config.js') }}"></script>
 </body>
 </html>
 """
@@ -370,39 +356,34 @@ PREDICT_HTML = """
 </script>
 """
 
-# Visualise page template
-VISUALISE_HTML = """
-<h1 style="margin-bottom: 20px;">Model Performance Visualizations</h1>
-<div style="display: flex; flex-direction: column; gap: 20px;">
-    {% if roc_curve %}
-    <div>
-        <h3>ROC Curve</h3>
-        <img src="{{ roc_curve }}" alt="ROC Curve" style="max-width: 100%; border-radius: 8px;">
-    </div>
-    {% endif %}
-    {% if confusion_matrix %}
-    <div>
-        <h3>Confusion Matrix</h3>
-        <img src="{{ confusion_matrix }}" alt="Confusion Matrix" style="max-width: 100%; border-radius: 8px;">
-    </div>
-    {% endif %}
-    {% if feature_importance %}
-    <div>
-        <h3>Feature Importance</h3>
-        <img src="{{ feature_importance }}" alt="Feature Importance" style="max-width: 100%; border-radius: 8px;">
-    </div>
-    {% endif %}
-    {% if correlation_matrix %}
-    <div>
-        <h3>Correlation Matrix</h3>
-        <img src="{{ correlation_matrix }}" alt="Correlation Matrix" style="max-width: 100%; border-radius: 8px;">
-    </div>
-    {% endif %}
-    {% if patient_distribution %}
-    <div>
-        <h3>Patient Distribution</h3>
-        <img src="{{ patient_distribution }}" alt="Patient Distribution" style="max-width: 100%; border-radius: 8px;">
-    </div>
+# Dataset page template
+DATASET_HTML = """
+<h1 style="margin-bottom: 20px;">Loaded Dataset</h1>
+<div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden;">
+        <thead style="background: rgba(187, 134, 252, 0.3);">
+            <tr>
+                {% for column in columns %}
+                <th style="padding: 12px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.2);">{{ column }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for _, row in dataset.iterrows() %}
+            {% if loop.index <= 100 %}
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                {% for column in columns %}
+                <td style="padding: 10px; text-align: left;">{{ row[column] }}</td>
+                {% endfor %}
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if dataset|length > 100 %}
+    <p style="margin-top: 15px; text-align: center; color: #BB86FC;">
+        Showing first 100 rows of {{ dataset|length }} total rows.
+    </p>
     {% endif %}
 </div>
 """
@@ -416,62 +397,22 @@ PREDICTION_RESULT_HTML = """
 </div>
 """
 
+# Visualization creation
 def create_visualization(viz_type, data, figsize=(10, 8), save_path=None):
-    """
-    Comprehensive visualization function that creates various healthcare analytics visualizations
-
-    Parameters:
-    -----------
-    viz_type : str
-        Type of visualization to create. Options are:
-        "roc_curve", "confusion_matrix", "feature_importance",
-        "correlation_matrix", "patient_distribution"
-
-    data : dict
-        Dictionary containing the data required for the visualization.
-        Required keys depend on the visualization type:
-        - roc_curve: X_test_scaled, y_test, model
-        - confusion_matrix: X_test_scaled, y_test, model
-        - feature_importance: feature_importances as {feature_name: importance_value, ...}
-        - correlation_matrix: features as DataFrame
-        - patient_distribution: X_test_scaled, y_test, model
-
-    figsize : tuple, optional
-        Size of the figure (width, height) in inches. Default is (10, 8)
-
-    save_path : str, optional
-        Path to save the figure. If None, the figure is not saved.
-
-    Returns:
-    --------
-    fig : Figure
-        The matplotlib Figure containing the visualization
-    """
     global fig
     try:
-        # Create figure
         fig, ax = plt.subplots(figsize=figsize)
-
-        # Process based on visualization type
         if viz_type.lower() == "roc_curve":
-            # Check required data
             if not all(k in data for k in ['X_test_scaled', 'y_test', 'model']):
                 return None
-
             model = data['model']
             X_test_scaled = data['X_test_scaled']
             y_test = data['y_test']
-
-            # Check if binary classification
             if len(model.classes_) != 2:
                 return None
-
-            # Get prediction probabilities and compute ROC curve
             y_prob = model.predict_proba(X_test_scaled)[:, 1]
             fpr, tpr, _ = roc_curve(y_test, y_prob)
             roc_auc = auc(fpr, tpr)
-
-            # Plot ROC curve
             ax.plot(fpr, tpr, lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
             ax.plot([0, 1], [0, 1], 'k--', lw=2)
             ax.set_xlim([0.0, 1.0])
@@ -480,146 +421,143 @@ def create_visualization(viz_type, data, figsize=(10, 8), save_path=None):
             ax.set_ylabel('True Positive Rate')
             ax.set_title('Receiver Operating Characteristic')
             ax.legend(loc="lower right")
-
         elif viz_type.lower() == "confusion_matrix":
-            # Check required data
             if not all(k in data for k in ['X_test_scaled', 'y_test', 'model']):
                 return None
-
             model = data['model']
             X_test_scaled = data['X_test_scaled']
             y_test = data['y_test']
-
-            # Get predictions and compute confusion matrix
             y_pred = model.predict(X_test_scaled)
             cm = confusion_matrix(y_test, y_pred)
-
-            # Plot confusion matrix
             sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
             ax.set_xlabel('Predicted Labels')
             ax.set_ylabel('True Labels')
             ax.set_title('Confusion Matrix')
-
         elif viz_type.lower() == "feature_importance":
-            # Check if feature importances provided
             if 'feature_importances' not in data or not data['feature_importances']:
                 return None
-
             feature_importances = data['feature_importances']
-
-            # Sort features by importance
             sorted_features = dict(sorted(feature_importances.items(), key=lambda x: x[1], reverse=True))
-
-            # Limit to top 20 features if there are many
             if len(sorted_features) > 20:
                 top_features = dict(list(sorted_features.items())[:20])
                 sorted_features = top_features
                 ax.set_title('Top 20 Features by Importance')
             else:
                 ax.set_title('Feature Importance')
-
-            # Plot feature importances
             bars = ax.barh(list(sorted_features.keys()), list(sorted_features.values()))
             ax.set_xlabel('Importance')
-
-            # Add values to the bars
             for bar in bars:
                 width = bar.get_width()
                 ax.text(width + 0.01, bar.get_y() + bar.get_height() / 2,
                         f'{width:.3f}', ha='left', va='center')
-
         elif viz_type.lower() == "correlation_matrix":
-            # Check if features dataframe provided
             if 'features' not in data or not isinstance(data['features'], pd.DataFrame):
                 return None
-
             features = data['features']
-
-            # Calculate correlation matrix
             corr_matrix = features.corr()
-
-            # Create heatmap with appropriate size
             if corr_matrix.shape[0] > 20:
-                # If too many features, focus on highest correlations
-                # Create a mask for correlations with absolute value > 0.3 (except diagonal)
                 mask = np.abs(corr_matrix) < 0.3
-                np.fill_diagonal(mask, False)  # Keep diagonal
-
+                np.fill_diagonal(mask, False)
                 sns.heatmap(corr_matrix, annot=False, cmap='coolwarm', center=0,
                             vmin=-1, vmax=1, ax=ax, mask=mask)
                 ax.set_title('Significant Feature Correlations (|r| >= 0.3)')
             else:
-                # If manageable size, show all correlations with annotations
                 sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0,
                             vmin=-1, vmax=1, ax=ax, fmt='.2f')
                 ax.set_title('Feature Correlation Matrix')
-
         elif viz_type.lower() == "patient_distribution":
-            # Check required data
             if not all(k in data for k in ['X_test_scaled', 'y_test', 'model']):
                 return None
-
             model = data['model']
             X_test_scaled = data['X_test_scaled']
             y_test = data['y_test']
-
-            # Get actual and predicted distributions
             y_pred = model.predict(X_test_scaled)
             actual_counts = pd.Series(y_test).value_counts().sort_index()
             predicted_counts = pd.Series(y_pred).value_counts().sort_index()
-
-            # Get unique classes and their labels
             classes = np.sort(np.unique(np.concatenate([y_test, y_pred])))
             if len(classes) == 2:
                 labels = ['No Disease', 'Disease']
             else:
                 labels = [f'Class {c}' for c in classes]
-
-            # Create bar plot
             x = np.arange(len(labels))
             width = 0.35
-
-            # Ensure actual_counts and predicted_counts have entries for all classes
             actual_values = [actual_counts.get(c, 0) for c in classes]
             predicted_values = [predicted_counts.get(c, 0) for c in classes]
-
             ax.bar(x - width / 2, actual_values, width, label='Actual', color='skyblue')
             ax.bar(x + width / 2, predicted_values, width, label='Predicted', color='salmon')
-
             ax.set_ylabel('Number of Patients')
             ax.set_title('Patient Distribution: Actual vs Predicted')
             ax.set_xticks(x)
             ax.set_xticklabels(labels)
             ax.legend()
-
-            # Add value labels on top of bars
             for i, v in enumerate(actual_values):
                 ax.text(i - width / 2, v + 0.5, str(v), ha='center')
             for i, v in enumerate(predicted_values):
                 ax.text(i + width / 2, v + 0.5, str(v), ha='center')
-
+        elif viz_type.lower() == "precision_recall_curve":
+            if not all(k in data for k in ['X_test_scaled', 'y_test', 'model']):
+                return None
+            model = data['model']
+            X_test_scaled = data['X_test_scaled']
+            y_test = data['y_test']
+            if len(model.classes_) != 2:
+                return None
+            y_prob = model.predict_proba(X_test_scaled)[:, 1]
+            precision, recall, _ = precision_recall_curve(y_test, y_prob)
+            ax.plot(recall, precision, marker='.', label='Precision-Recall curve')
+            ax.set_xlabel('Recall')
+            ax.set_ylabel('Precision')
+            ax.set_title('Precision-Recall Curve')
+            ax.grid(True)
+            ap = precision_score(y_test, model.predict(X_test_scaled))
+            ax.text(0.05, 0.05, f'Average Precision: {ap:.3f}', transform=ax.transAxes,
+                    bbox=dict(facecolor='white', alpha=0.8))
+        elif viz_type.lower() == "model_metrics":
+            if not all(k in data for k in ['X_test_scaled', 'y_test', 'model']):
+                return None
+            model = data['model']
+            X_test_scaled = data['X_test_scaled']
+            y_test = data['y_test']
+            y_pred = model.predict(X_test_scaled)
+            accuracy = accuracy_score(y_test, y_pred)
+            f1 = f1_score(y_test, y_pred, average='weighted')
+            precision = precision_score(y_test, y_pred, average='weighted')
+            recall = recall_score(y_test, y_pred, average='weighted')
+            if len(model.classes_) == 2:
+                try:
+                    y_prob = model.predict_proba(X_test_scaled)[:, 1]
+                    auc_score = roc_auc_score(y_test, y_prob)
+                except:
+                    auc_score = 0
+            else:
+                auc_score = 0
+            metrics = ['Accuracy', 'F1 Score', 'Precision', 'Recall', 'AUC-ROC']
+            values = [accuracy, f1, precision, recall, auc_score]
+            bars = ax.bar(metrics, values, color=['#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#FF5722'])
+            ax.set_ylim([0, 1.1])
+            ax.set_title('Model Performance Metrics')
+            ax.set_ylabel('Score')
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2., height + 0.02,
+                        f'{height:.3f}', ha='center', va='bottom')
+            ax.yaxis.grid(True, linestyle='--', alpha=0.7)
         else:
             plt.close(fig)
             return None
-
-        # Apply tight layout
         fig.tight_layout()
-
-        # Save figure if path provided
         if save_path:
             try:
                 fig.savefig(save_path, bbox_inches='tight', dpi=300)
             except Exception:
                 pass
-
         return fig
-
     except Exception:
         if 'fig' in locals():
             plt.close(fig)
         return None
 
-
+# Class entry
 class HealthcareAI:
     def __init__(self):
         self.dataset = None
@@ -732,10 +670,8 @@ class HealthcareAI:
         except Exception:
             return None
 
-
 # Initialize AI system
 ai_system = HealthcareAI()
-
 
 @app.route('/', methods=['GET', 'POST'])
 def predict():
@@ -791,55 +727,174 @@ def predict():
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 
+@app.route('/dataset')
+def show_dataset():
+    if ai_system.dataset is None:
+        flash('Dataset not loaded. Ensure heart.csv is in the correct directory.', 'error')
+        content = "<p>No dataset available. Please ensure the dataset is loaded.</p>"
+    else:
+        try:
+            # Limited to first 100 rows for performance
+            content = render_template_string(DATASET_HTML,
+                                             dataset=ai_system.dataset.head(100),
+                                             columns=ai_system.dataset.columns)
+        except Exception as e:
+            flash(f"Error displaying dataset: {str(e)}", 'error')
+            content = "<p>Error displaying dataset.</p>"
 
-@app.route('/visualise')
-def visualise():
-    # Clear previous images
-    images_dir = os.path.join(app.root_path, 'static', 'images')
-    if os.path.exists(images_dir):
-        shutil.rmtree(images_dir)
-    os.makedirs(images_dir, exist_ok=True)
-
-    # Check if data is available
-    if (ai_system.best_model is None or ai_system.X_test_scaled is None or
-            ai_system.y_test is None or ai_system.features is None):
-        flash('Cannot generate visualizations: Model or data not available.', 'error')
-        content = "<p>No visualizations available. Please ensure the model is trained and data is loaded.</p>"
-        response = make_response(render_template_string(BASE_HTML, title="Visualise Results", content=content))
+    try:
+        response = make_response(render_template_string(BASE_HTML, title="Loaded Dataset", content=content))
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+    except Exception as e:
+        flash(f"Error rendering page: {str(e)}", 'error')
+        response = make_response(
+            render_template_string(BASE_HTML, title="Loaded Dataset", content="<p>Error loading page.</p>"))
         response.headers['Content-Type'] = 'text/html; charset=utf-8'
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 
-    # Prepare common data
+@app.route('/model_visualisations')
+def model_visualisations():
+    images_dir = os.path.join(app.root_path, 'static', 'images')
+    if os.path.exists(images_dir):
+        shutil.rmtree(images_dir)
+    os.makedirs(images_dir, exist_ok=True)
+
+    if (ai_system.best_model is None or ai_system.X_test_scaled is None or
+            ai_system.y_test is None or ai_system.features is None):
+        flash('Cannot generate visualizations: Model or data not available.', 'error')
+        content = "<p>No visualizations available. Please ensure the model is trained and data is loaded.</p>"
+        response = make_response(render_template_string(BASE_HTML, title="Model Visualisations", content=content))
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+
     common_data = {
         'X_test_scaled': ai_system.X_test_scaled,
         'y_test': ai_system.y_test,
         'model': ai_system.best_model
     }
 
-    # Generate visualizations
     visualizations = {
+        'model_metrics': None,
         'roc_curve': None,
-        'confusion_matrix': None,
-        'feature_importance': None,
-        'correlation_matrix': None,
-        'patient_distribution': None
+        'precision_recall_curve': None,
+        'confusion_matrix': None
     }
+
+    # Model Metrics
+    fig = create_visualization('model_metrics', common_data, figsize=(10, 6),
+                               save_path=os.path.join(images_dir, 'model_metrics.png'))
+    if fig:
+        visualizations['model_metrics'] = '/static/images/model_metrics.png'
+        plt.close(fig)
 
     # ROC Curve
     fig = create_visualization('roc_curve', common_data, figsize=(8, 6),
                                save_path=os.path.join(images_dir, 'roc_curve.png'))
     if fig:
-        visualizations['roc_curve'] = '/images/roc_curve.png'
+        visualizations['roc_curve'] = '/static/images/roc_curve.png'
+        plt.close(fig)
+
+    # Precision-Recall Curve
+    fig = create_visualization('precision_recall_curve', common_data, figsize=(8, 6),
+                               save_path=os.path.join(images_dir, 'precision_recall_curve.png'))
+    if fig:
+        visualizations['precision_recall_curve'] = '/static/images/precision_recall_curve.png'
         plt.close(fig)
 
     # Confusion Matrix
     fig = create_visualization('confusion_matrix', common_data, figsize=(6, 6),
                                save_path=os.path.join(images_dir, 'confusion_matrix.png'))
     if fig:
-        visualizations['confusion_matrix'] = '/images/confusion_matrix.png'
+        visualizations['confusion_matrix'] = '/static/images/confusion_matrix.png'
         plt.close(fig)
+
+    try:
+        # Use only the Model Visualisations section from the VISUALISE_HTML template
+        model_visualisations_html = """
+        <h1 style="margin-bottom: 20px;">Model Performance Visualizations</h1>
+
+        <!-- Model Visualisations Section -->
+        <div style="background: rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                {% if model_metrics %}
+                <div>
+                    <h3>Model Performance Metrics</h3>
+                    <img src="{{ model_metrics }}" alt="Model Performance Metrics" style="max-width: 100%; border-radius: 8px;">
+                </div>
+                {% endif %}
+                {% if roc_curve %}
+                <div>
+                    <h3>ROC Curve</h3>
+                    <img src="{{ roc_curve }}" alt="ROC Curve" style="max-width: 100%; border-radius: 8px;">
+                </div>
+                {% endif %}
+                {% if precision_recall_curve %}
+                <div>
+                    <h3>Precision-Recall Curve</h3>
+                    <img src="{{ precision_recall_curve }}" alt="Precision-Recall Curve" style="max-width: 100%; border-radius: 8px;">
+                </div>
+                {% endif %}
+                {% if confusion_matrix %}
+                <div>
+                    <h3>Confusion Matrix</h3>
+                    <img src="{{ confusion_matrix }}" alt="Confusion Matrix" style="max-width: 100%; border-radius: 8px;">
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        """
+
+        content = render_template_string(model_visualisations_html, **visualizations)
+        response = make_response(render_template_string(BASE_HTML, title="Model Visualisations", content=content))
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+    except Exception as e:
+        flash(f"Error rendering visualisation page: {str(e)}", 'error')
+        response = make_response(render_template_string(BASE_HTML, title="Model Visualisations",
+                                                        content="<p>Error loading visualisations.</p>"))
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+@app.route('/patient_visualisations')
+def patient_visualisations():
+    images_dir = os.path.join(app.root_path, 'static', 'images')
+    if os.path.exists(images_dir):
+        shutil.rmtree(images_dir)
+    os.makedirs(images_dir, exist_ok=True)
+
+    if (ai_system.best_model is None or ai_system.X_test_scaled is None or
+            ai_system.y_test is None or ai_system.features is None):
+        flash('Cannot generate visualizations: Model or data not available.', 'error')
+        content = "<p>No visualizations available. Please ensure the model is trained and data is loaded.</p>"
+        response = make_response(
+            render_template_string(BASE_HTML, title="Patient Result Visualisations", content=content))
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+    common_data = {
+        'X_test_scaled': ai_system.X_test_scaled,
+        'y_test': ai_system.y_test,
+        'model': ai_system.best_model
+    }
+
+    visualizations = {
+        'feature_importance': None,
+        'correlation_matrix': None,
+        'patient_distribution': None
+    }
 
     # Feature Importance
     feature_importances = {}
@@ -853,38 +908,67 @@ def visualise():
         fig = create_visualization('feature_importance', {'feature_importances': feature_importances},
                                    figsize=(10, 8), save_path=os.path.join(images_dir, 'feature_importance.png'))
         if fig:
-            visualizations['feature_importance'] = '/images/feature_importance.png'
+            visualizations['feature_importance'] = '/static/images/feature_importance.png'
             plt.close(fig)
 
     # Correlation Matrix
     fig = create_visualization('correlation_matrix', {'features': ai_system.dataset[ai_system.original_columns]},
                                figsize=(10, 8), save_path=os.path.join(images_dir, 'correlation_matrix.png'))
     if fig:
-        visualizations['correlation_matrix'] = '/images/correlation_matrix.png'
+        visualizations['correlation_matrix'] = '/static/images/correlation_matrix.png'
         plt.close(fig)
 
     # Patient Distribution
     fig = create_visualization('patient_distribution', common_data, figsize=(8, 6),
                                save_path=os.path.join(images_dir, 'patient_distribution.png'))
     if fig:
-        visualizations['patient_distribution'] = '/images/patient_distribution.png'
+        visualizations['patient_distribution'] = '/static/images/patient_distribution.png'
         plt.close(fig)
 
     try:
-        content = render_template_string(VISUALISE_HTML, **visualizations)
-        response = make_response(render_template_string(BASE_HTML, title="Visualise Results", content=content))
+        patient_visualisations_html = """
+        <h1 style="margin-bottom: 20px;">Patient Result Visualizations</h1>
+
+        <!-- Patient Result Visualisations Section -->
+        <div style="background: rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                {% if feature_importance %}
+                <div>
+                    <h3>Feature Importance</h3>
+                    <img src="{{ feature_importance }}" alt="Feature Importance" style="max-width: 100%; border-radius: 8px;">
+                </div>
+                {% endif %}
+                {% if correlation_matrix %}
+                <div>
+                    <h3>Correlation Matrix</h3>
+                    <img src="{{ correlation_matrix }}" alt="Correlation Matrix" style="max-width: 100%; border-radius: 8px;">
+                </div>
+                {% endif %}
+                {% if patient_distribution %}
+                <div>
+                    <h3>Patient Distribution</h3>
+                    <img src="{{ patient_distribution }}" alt="Patient Distribution" style="max-width: 100%; border-radius: 8px;">
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        """
+
+        content = render_template_string(patient_visualisations_html, **visualizations)
+        response = make_response(
+            render_template_string(BASE_HTML, title="Patient Result Visualisations", content=content))
         response.headers['Content-Type'] = 'text/html; charset=utf-8'
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
     except Exception as e:
         flash(f"Error rendering visualisation page: {str(e)}", 'error')
-        response = make_response(render_template_string(BASE_HTML, title="Visualise Results", content=VISUALISE_HTML))
+        response = make_response(render_template_string(BASE_HTML, title="Patient Result Visualisations",
+                                                        content="<p>Error loading visualisations.</p>"))
         response.headers['Content-Type'] = 'text/html; charset=utf-8'
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
-
 
 @app.route('/images/<filename>')
 def serve_image(filename):
@@ -894,14 +978,12 @@ def serve_image(filename):
         flash(f"Error serving image: {str(e)}", 'error')
         return '', 404
 
-
 @app.route('/favicon.ico')
 def favicon():
     return '', 204
 
-
 if __name__ == '__main__':
     app.run(debug=True)
     import os
-    port = int(os.environ.get('PORT', 5000)) 
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
