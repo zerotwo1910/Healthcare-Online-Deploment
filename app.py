@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg')  # Set non-interactive backend before importing pyplot
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -43,20 +43,37 @@ BASE_HTML = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+        
+        :root {
+            --primary: #3498db;
+            --secondary: #e74c3c;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --info: #9b59b6;
+            --background: #121212;
+            --text: #F5F5F5;
+            --accent: #BB86FC;
+            --sidebar-width: 220px;
+            --sidebar-bg: rgba(30, 30, 50, 0.8);
+            --container-bg: rgba(40, 40, 60, 0.7); 
+        }
+        
         body {
             font-family: 'Roboto', sans-serif;
-            background: #121212;
-            color: #F5F5F5;
+            background: var(--background);
+            color: var(--text);
             min-height: 100vh;
             position: relative;
+            line-height: 1.6;
         }
+        
         #particles-js {
             position: fixed;
             width: 100%;
@@ -64,85 +81,369 @@ BASE_HTML = """
             background: linear-gradient(135deg, #1f1b4e, #3f51b5);
             z-index: -1;
         }
+        
         .sidebar {
-            width: 200px;
+            width: var(--sidebar-width);
             height: 100vh;
             position: fixed;
             top: 0;
             left: 0;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 20px;
-            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(15px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 25px 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            transition: transform 0.3s ease;
         }
+        
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-header svg {
+            margin-right: 10px;
+            fill: var(--accent);
+        }
+        
         .sidebar h3 {
-            color: #BB86FC;
-            margin-bottom: 20px;
+            color: var(--accent);
+            font-size: 1.4rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
         }
+        
+        .nav-links {
+            margin-top: 20px;
+        }
+        
         .sidebar a {
-            display: block;
-            color: #F5F5F5;
+            display: flex;
+            align-items: center;
+            color: var(--text);
             text-decoration: none;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 12px 15px;
+            margin-bottom: 12px;
             border-radius: 8px;
-            transition: background 0.3s;
+            transition: all 0.3s;
+            font-weight: 400;
         }
+        
+        .sidebar a svg {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+        }
+        
         .sidebar a:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(5px);
         }
+        
+        .sidebar a.active {
+            background: rgba(187, 134, 252, 0.2);
+            border-left: 3px solid var(--accent);
+        }
+        
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 100;
+            background: var(--container-bg);
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            color: var(--text);
+        }
+        
         .main-content {
-            margin-left: 220px;
+            margin-left: var(--sidebar-width);
             padding: 30px;
-            max-width: 1000px;
+            max-width: 1200px;
+            transition: margin 0.3s ease;
         }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        
+        .page-header h1 {
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--text);
+            position: relative;
+        }
+        
+        .page-header h1::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: var(--accent);
+            border-radius: 3px;
+        }
+        
         .glass-container {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: var(--container-bg);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            margin-bottom: 25px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
+        
+        .glass-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+        }
+        
         .flash-message {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
             text-align: center;
-            color: #F5F5F5;
+            color: var(--text);
+            animation: fadeIn 0.5s;
         }
+        
         .flash-message.error {
-            border-color: #ef5350;
-            color: #ef5350;
+            border-color: var(--secondary);
+            color: var(--secondary);
         }
+        
         .flash-message.success {
-            border-color: #4caf50;
-            color: #4caf50;
+            border-color: var(--success);
+            color: var(--success);
         }
-        input:focus, select:focus, button:focus {
-            outline: 2px solid #BB86FC;
-            outline-offset: 2px;
+        
+        input, select, textarea, button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 10px 15px;
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            transition: all 0.3s;
         }
+        
+        input:focus, select:focus, textarea:focus, button:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(187, 134, 252, 0.3);
+        }
+        
+        button {
+            cursor: pointer;
+            background: var(--accent);
+            color: #121212;
+            font-weight: 500;
+            border: none;
+            padding: 10px 20px;
+        }
+        
+        button:hover {
+            background: #9a67e0;
+        }
+        
         label {
-            color: #F5F5F5;
+            color: var(--text);
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .data-card {
+            background: rgba(30, 30, 50, 0.6);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid var(--primary);
+            transition: transform 0.3s ease;
+        }
+        
+        .data-card:hover {
+            transform: translateX(5px);
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(30, 30, 50, 0.6);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:nth-child(1) {
+            border-top: 3px solid var(--primary);
+        }
+        
+        .stat-card:nth-child(2) {
+            border-top: 3px solid var(--secondary);
+        }
+        
+        .stat-card:nth-child(3) {
+            border-top: 3px solid var(--success);
+        }
+        
+        .stat-card:nth-child(4) {
+            border-top: 3px solid var(--info);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card h3 {
+            font-size: 2rem;
+            margin: 10px 0;
+        }
+        
+        .stat-card p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+        
+        footer {
+            margin-left: var(--sidebar-width);
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.5);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            transition: margin 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @media (max-width: 992px) {
+            .data-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .mobile-toggle {
+                display: flex;
+            }
+            
+            .main-content, footer {
+                margin-left: 0;
+                padding: 20px 15px;
+            }
+            
+            .data-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div id="particles-js"></div>
+    
+    <button class="mobile-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </button>
 
-    <div class="sidebar">
-        <h3>Healthcare AI</h3>
-        <a href="/" aria-label="Go to Home page">Home</a>
-        <a href="/dataset" aria-label="View loaded dataset">Loaded Dataset</a>
-        <a href="/model_visualisations" aria-label="Visualize model performance">Model Visualisations</a>
-        <a href="/patient_visualisations" aria-label="Visualize patient results">Patient Visualisations</a>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+            </svg>
+            <h3>Healthcare AI</h3>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="active" aria-label="Go to Home page">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                Home
+            </a>
+            <a href="/dataset" aria-label="View loaded dataset">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                </svg>
+                Dataset
+            </a>
+            <a href="/model_visualisations" aria-label="Visualize model performance">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                Model Insights
+            </a>
+            <a href="/patient_visualisations" aria-label="Visualize patient results">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                Patient Analytics
+            </a>
+        </div>
     </div>
+    
     <div class="main-content">
+        <div class="page-header">
+            <h1>{{ title }}</h1>
+        </div>
+        
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -152,14 +453,40 @@ BASE_HTML = """
                 {% endfor %}
             {% endif %}
         {% endwith %}
+        
         <div class="glass-container">
             {{ content | safe }}
         </div>
     </div>
+    
+    <footer>
+        © Healthcare AI Platform 2025 | Advanced Patient Analytics & Insights
+    </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
     <script src="{{ url_for('static', filename='js/particles-config.js') }}"></script>
+    
+    <script>
+        // Mobile sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+        
+        // Set active nav item based on current page
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentLocation = window.location.pathname;
+            const navLinks = document.querySelectorAll('.sidebar a');
+            
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentLocation) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 """
